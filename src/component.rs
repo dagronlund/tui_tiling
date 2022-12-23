@@ -111,8 +111,8 @@ impl ComponentBase for Component {
         let in_component = x < self.width && y < self.height;
         let in_widget = x >= self.border_width
             && y >= self.border_width
-            && x < self.width - self.border_width * 2
-            && y < self.height - self.border_width * 2;
+            && x < self.width - self.border_width
+            && y < self.height - self.border_width;
         // Check if the mouse event should focus this component
         match kind {
             MouseEventKind::Down(MouseButton::Left) if in_component => self.set_focus(Focus::Focus),
@@ -217,16 +217,25 @@ impl ComponentBase for Component {
                 block.render(area, buf)
             }
         }
-        // Render widget (adjusting for borders)
-        self.widget.render(
-            Rect {
-                x: area.x + self.get_border_width(),
-                y: area.y + self.get_border_width(),
-                width: area.width - self.get_border_width() * 2,
-                height: area.height - self.get_border_width() * 2,
-            },
-            buf,
-        );
+        // Do not render widget if borders take whole area
+        if area.width <= self.get_border_width() * 2 || area.height <= self.get_border_width() * 2 {
+            return;
+        }
+        // Adjust for borders in determing area to draw
+        let rect = Rect {
+            x: area.x + self.get_border_width(),
+            y: area.y + self.get_border_width(),
+            width: area.width - self.get_border_width() * 2,
+            height: area.height - self.get_border_width() * 2,
+        };
+        // Clear widget
+        for x in rect.x..(rect.x + rect.width) {
+            for y in rect.y..(rect.y + rect.height) {
+                buf.get_mut(x, y).reset();
+            }
+        }
+        // Render widget
+        self.widget.render(rect, buf);
     }
 
     fn get_focus(&self) -> Focus {

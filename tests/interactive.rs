@@ -159,65 +159,42 @@ fn cleanup_terminal_force() -> Result<()> {
     cleanup_terminal(&mut Terminal::new(CrosstermBackend::new(stdout()))?)
 }
 
-#[derive(Debug)]
-pub struct FrameDuration {
-    start: Instant,
-    sections: Vec<(String, Duration)>,
-}
-
-impl FrameDuration {
-    pub fn new() -> Self {
-        Self {
-            start: Instant::now(),
-            sections: Vec::new(),
-        }
-    }
-
-    pub fn timestamp(&mut self, name: String) {
-        let duration = self.start.elapsed();
-        self.sections.push((name, duration));
-        self.start = Instant::now();
-    }
-
-    pub fn total(&self) -> Duration {
-        let mut total = Duration::new(0, 0);
-        for (_, d) in &self.sections {
-            total += d.clone();
-        }
-        total
-    }
-}
-
 fn tui_main_unmanaged(terminal: &mut Terminal<CrosstermBackend<Stdout>>) -> Result<String> {
-    use std::collections::VecDeque;
-
     let (tx_input, rx_input) = unbounded();
     let mut container = get_tui_container();
-    let mut durations: VecDeque<FrameDuration> = VecDeque::new();
+    let mut last_buffer: Option<Buffer> = None;
     spawn_input_listener(tx_input);
 
     loop {
-        let mut frame_duration = FrameDuration::new();
         let frame_start = Instant::now();
 
-        terminal.draw(|frame| {
+        // Check if the last buffer can be reused
+        if let Some(mut last_buffer) = last_buffer {
+            if last_buffer.area == terminal.current_buffer_mut().area {
+                std::mem::swap(
+                    &mut terminal.current_buffer_mut().content,
+                    &mut last_buffer.content,
+                );
+            }
+        }
+
+        // Render the next frame
+        let next_frame = terminal.draw(|frame| {
             if let Err(err) = container
                 .as_base_mut()
                 .resize(frame.size().width, frame.size().height)
             {
                 panic!("Resizing Error! ({err:?})");
             }
-            container.as_base_mut().invalidate();
             frame.render_stateful_widget(
                 ComponentBaseWidget::from(container.as_base_mut()),
                 frame.size(),
                 &mut (),
             );
-            frame_duration.timestamp(String::from("render"));
         })?;
+        last_buffer = Some(next_frame.buffer.clone());
 
         let mut done_msg = None;
-
         while !rx_input.is_empty() {
             match rx_input.recv().unwrap() {
                 CrosstermEvent::Key(key) => {
@@ -239,16 +216,12 @@ fn tui_main_unmanaged(terminal: &mut Terminal<CrosstermBackend<Stdout>>) -> Resu
                 }
             }
         }
-        frame_duration.timestamp(String::from("input"));
 
+        // Check if done
         if let Some(msg) = done_msg {
             cleanup_terminal(terminal)?;
-            for d in durations {
-                println!("{:?}, (Total: {:?})", d.sections, d.total());
-            }
             return Ok(msg);
         }
-        frame_duration.timestamp(String::from("check"));
 
         // Sleep for unused frame time
         let frame_target = Duration::from_millis(20);
@@ -256,12 +229,6 @@ fn tui_main_unmanaged(terminal: &mut Terminal<CrosstermBackend<Stdout>>) -> Resu
         if frame_elapsed < frame_target {
             thread::sleep(frame_target - frame_start.elapsed());
         }
-        frame_duration.timestamp(String::from("sleep"));
-
-        if durations.len() >= 2 {
-            durations.pop_front();
-        }
-        durations.push_back(frame_duration);
     }
 }
 
