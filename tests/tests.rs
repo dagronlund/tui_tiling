@@ -1,6 +1,8 @@
 pub mod interactive;
 
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEventKind};
+use crossterm::event::{
+    KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers, MouseButton, MouseEventKind,
+};
 use tui::layout::Direction;
 
 use tui_layout::{
@@ -153,6 +155,8 @@ fn test_tui_layout() -> Result<(), tui_layout::ResizeError> {
     list_horizontal.handle_key(KeyEvent {
         code: KeyCode::Enter,
         modifiers: KeyModifiers::empty(),
+        kind: KeyEventKind::Press,
+        state: KeyEventState::empty(),
     });
 
     match list_horizontal.as_container().search_focused() {
@@ -168,6 +172,8 @@ fn test_tui_layout() -> Result<(), tui_layout::ResizeError> {
     list_horizontal.handle_key(KeyEvent {
         code: KeyCode::Enter,
         modifiers: KeyModifiers::empty(),
+        kind: KeyEventKind::Press,
+        state: KeyEventState::empty(),
     });
 
     match list_horizontal.as_container().search_focused() {
@@ -183,6 +189,8 @@ fn test_tui_layout() -> Result<(), tui_layout::ResizeError> {
     list_horizontal.handle_key(KeyEvent {
         code: KeyCode::Esc,
         modifiers: KeyModifiers::empty(),
+        kind: KeyEventKind::Press,
+        state: KeyEventState::empty(),
     });
 
     match list_horizontal.as_container().search_focused() {
@@ -198,6 +206,8 @@ fn test_tui_layout() -> Result<(), tui_layout::ResizeError> {
     list_horizontal.handle_key(KeyEvent {
         code: KeyCode::Down,
         modifiers: KeyModifiers::empty(),
+        kind: KeyEventKind::Press,
+        state: KeyEventState::empty(),
     });
 
     match list_horizontal.as_container().search_focused() {
@@ -213,6 +223,8 @@ fn test_tui_layout() -> Result<(), tui_layout::ResizeError> {
     list_horizontal.handle_key(KeyEvent {
         code: KeyCode::Right,
         modifiers: KeyModifiers::empty(),
+        kind: KeyEventKind::Press,
+        state: KeyEventState::empty(),
     });
 
     match list_horizontal.as_container().search_focused() {
@@ -228,6 +240,8 @@ fn test_tui_layout() -> Result<(), tui_layout::ResizeError> {
     list_horizontal.handle_key(KeyEvent {
         code: KeyCode::Right,
         modifiers: KeyModifiers::empty(),
+        kind: KeyEventKind::Press,
+        state: KeyEventState::empty(),
     });
 
     match list_horizontal.as_container().search_focused() {

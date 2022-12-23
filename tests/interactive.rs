@@ -214,6 +214,9 @@ fn tui_main_unmanaged(terminal: &mut Terminal<CrosstermBackend<Stdout>>) -> Resu
                         panic!("Resizing Error! ({err:?})");
                     }
                 }
+                CrosstermEvent::FocusGained
+                | CrosstermEvent::FocusLost
+                | CrosstermEvent::Paste(_) => {}
             }
         }
 
