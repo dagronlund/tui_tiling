@@ -1,3 +1,5 @@
+pub mod simple;
+
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEventKind};
 use tui::{
     buffer::Buffer,

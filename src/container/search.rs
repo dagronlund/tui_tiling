@@ -1,7 +1,7 @@
 use tui::layout::Rect;
 
 use crate::{
-    component::{Component, ComponentBase},
+    component::{Component, ComponentBase, ComponentWidget},
     container::{Container, ContainerChild},
     pos::ComponentPos,
     Focus, FocusResult,
@@ -14,9 +14,40 @@ pub trait ContainerSearch {
     fn search_position(&self, pos: ComponentPos) -> Option<(&Component, ComponentPos)>;
     fn search_position_mut(&mut self, pos: ComponentPos) -> Option<(&mut Component, ComponentPos)>;
 
-    fn search_name(&self, path: Vec<String>) -> Option<(&ContainerChild, ComponentPos)>;
-    fn search_name_mut(&mut self, path: Vec<String>)
-        -> Option<(&mut ContainerChild, ComponentPos)>;
+    fn search_name(&self, path: &str) -> Option<(&ContainerChild, ComponentPos)>;
+    fn search_name_mut(&mut self, path: &str) -> Option<(&mut ContainerChild, ComponentPos)>;
+
+    fn search_name_widget<T>(&self, path: &str) -> Option<(&T, ComponentPos)>
+    where
+        T: ComponentWidget + 'static,
+    {
+        let Some((child, pos)) = self.search_name(path) else {
+            return None;
+        };
+        let ContainerChild::Component(component) = child else {
+            return None;
+        };
+        let Some(widget) = component.get_widget_as_any().downcast_ref::<T>() else {
+            return None;
+        };
+        Some((widget, pos))
+    }
+
+    fn search_name_widget_mut<T>(&mut self, path: &str) -> Option<(&mut T, ComponentPos)>
+    where
+        T: ComponentWidget + 'static,
+    {
+        let Some((child, pos)) = self.search_name_mut(path) else {
+            return None;
+        };
+        let ContainerChild::Component(component) = child else {
+            return None;
+        };
+        let Some(widget) = component.get_widget_as_any_mut().downcast_mut::<T>() else {
+            return None;
+        };
+        Some((widget, pos))
+    }
 }
 
 fn get_positions(container: &dyn Container) -> Vec<ComponentPos> {
@@ -120,51 +151,56 @@ impl<'a> ContainerSearch for dyn Container + 'a {
         None
     }
 
-    fn search_name(&self, path: Vec<String>) -> Option<(&ContainerChild, ComponentPos)> {
-        if path.len() == 0 {
-            return None;
-        }
+    fn search_name(&self, path: &str) -> Option<(&ContainerChild, ComponentPos)> {
+        let (before, after) = if let Some((before, after)) = path.split_once(".") {
+            (before, Some(after))
+        } else {
+            (path, None)
+        };
         let child_offsets = get_positions(self);
         for (i, child) in self.get_children().iter().enumerate() {
-            if path[0] != child.as_base().get_name() {
+            if before != child.as_base().get_name() {
                 continue;
             }
-            match child {
-                child @ ContainerChild::Component(_) => {
-                    return Some((child, child_offsets[i].clone()))
-                }
+            return match child {
+                child @ ContainerChild::Component(_) => Some((child, child_offsets[i].clone())),
                 ContainerChild::Container(child) => {
-                    if let Some((child, pos)) = child.search_name(path[1..].to_vec()) {
-                        return Some((child, child_offsets[i].clone() + pos));
-                    }
+                    let Some(after) = after else {
+                        continue;
+                    };
+                    let Some((child, pos)) = child.search_name(after) else {
+                        continue ;
+                    };
+                    Some((child, child_offsets[i].clone() + pos))
                 }
-            }
+            };
         }
         None
     }
 
-    fn search_name_mut(
-        &mut self,
-        path: Vec<String>,
-    ) -> Option<(&mut ContainerChild, ComponentPos)> {
-        if path.len() == 0 {
-            return None;
-        }
+    fn search_name_mut(&mut self, path: &str) -> Option<(&mut ContainerChild, ComponentPos)> {
+        let (before, after) = if let Some((before, after)) = path.split_once(".") {
+            (before, Some(after))
+        } else {
+            (path, None)
+        };
         let child_offsets = get_positions(self);
         for (i, child) in self.get_children_mut().iter_mut().enumerate() {
-            if path[0] != child.as_base().get_name() {
+            if before != child.as_base().get_name() {
                 continue;
             }
-            match child {
-                child @ ContainerChild::Component(_) => {
-                    return Some((child, child_offsets[i].clone()))
-                }
+            return match child {
+                child @ ContainerChild::Component(_) => Some((child, child_offsets[i].clone())),
                 ContainerChild::Container(child) => {
-                    if let Some((child, pos)) = child.search_name_mut(path[1..].to_vec()) {
-                        return Some((child, child_offsets[i].clone() + pos));
-                    }
+                    let Some(after) = after else {
+                        continue;
+                    };
+                    let Some((child, pos)) = child.search_name_mut(after) else {
+                        continue ;
+                    };
+                    Some((child, child_offsets[i].clone() + pos))
                 }
-            }
+            };
         }
         None
     }

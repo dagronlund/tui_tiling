@@ -52,7 +52,8 @@ fn test_tui_layout() -> Result<(), tui_layout::ResizeError> {
     let _ = list_horizontal.add_component(component_c);
 
     assert_ne!(list_horizontal.resize(20, 0), Ok(()));
-    assert_ne!(list_horizontal.resize(0, 0), Ok(()));
+    // Size should still be zero since last change was un-done
+    assert_eq!(list_horizontal.resize(0, 0), Ok(()));
     assert_ne!(list_horizontal.resize(20, 1), Ok(()));
     assert_ne!(list_horizontal.resize(1, 20), Ok(()));
 
@@ -82,45 +83,33 @@ fn test_tui_layout() -> Result<(), tui_layout::ResizeError> {
         println!();
     }
 
-    let (comp, pos) = list_horizontal
-        .as_container()
-        .search_name("c".split(".").map(|s| String::from(s)).collect())
-        .unwrap();
+    let (comp, pos) = list_horizontal.as_container().search_name("c").unwrap();
     assert_eq!(comp.as_base().get_name(), String::from("c"));
     assert_eq!(pos, ComponentPos { x: 16, y: 0 });
 
     let (comp, pos) = list_horizontal
         .as_container()
-        .search_name("vertical.a".split(".").map(|s| String::from(s)).collect())
+        .search_name("vertical.a")
         .unwrap();
     assert_eq!(comp.as_base().get_name(), String::from("a"));
     assert_eq!(pos, ComponentPos { x: 0, y: 0 });
 
     let (comp, pos) = list_horizontal
         .as_container()
-        .search_name("vertical.b".split(".").map(|s| String::from(s)).collect())
+        .search_name("vertical.b")
         .unwrap();
     assert_eq!(comp.as_base().get_name(), String::from("b"));
     assert_eq!(pos, ComponentPos { x: 0, y: 4 });
 
-    if let Some(_) = list_horizontal
-        .as_container()
-        .search_name("".split(".").map(|s| String::from(s)).collect())
-    {
+    if let Some(_) = list_horizontal.as_container().search_name("") {
         panic!("<empty> does not exist!");
     }
 
-    if let Some(_) = list_horizontal
-        .as_container()
-        .search_name("vertical.c".split(".").map(|s| String::from(s)).collect())
-    {
+    if let Some(_) = list_horizontal.as_container().search_name("vertical.c") {
         panic!("vertical.c does not exist!");
     }
 
-    if let Some(_) = list_horizontal
-        .as_container()
-        .search_name("vertical.c".split(".").map(|s| String::from(s)).collect())
-    {
+    if let Some(_) = list_horizontal.as_container().search_name("vertical.c") {
         panic!("vertical.b.c does not exist!");
     }
 

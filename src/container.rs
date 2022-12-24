@@ -24,6 +24,20 @@ impl ContainerChild {
             Self::Component(component) => component,
         }
     }
+
+    pub fn unwrap_component(&self) -> &Component {
+        match self {
+            Self::Component(component) => component,
+            Self::Container(_) => panic!("Found container, not component!"),
+        }
+    }
+
+    pub fn unwrap_component_mut(&mut self) -> &mut Component {
+        match self {
+            Self::Component(component) => component,
+            Self::Container(_) => panic!("Found container, not component!"),
+        }
+    }
 }
 
 // // TODO: Lifetime issues?

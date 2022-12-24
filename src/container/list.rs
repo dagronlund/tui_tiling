@@ -430,19 +430,34 @@ impl ComponentBase for ContainerList {
             return Ok(());
         }
         let ratios = self.get_ratios();
+        let orientation = orientation_scalar(&self.orientation, width, height);
+        let old_sizes = self
+            .children
+            .iter()
+            .map(|c| (c.as_base().get_width(), c.as_base().get_height()))
+            .collect::<Vec<(u16, u16)>>();
+        let new_sizes = ContainerList::calculate_sizes(ratios, orientation)
+            .iter()
+            .map(|s| match self.orientation {
+                Direction::Horizontal => (*s, height),
+                Direction::Vertical => (width, *s),
+            })
+            .collect::<Vec<(u16, u16)>>();
+        for i in 0..self.children.len() {
+            if let Err(err) = self.children[i]
+                .as_base_mut()
+                .resize(new_sizes[i].0, new_sizes[i].1)
+            {
+                for i in 0..self.children.len() {
+                    let _ = self.children[i]
+                        .as_base_mut()
+                        .resize(old_sizes[i].0, old_sizes[i].1);
+                }
+                return Err(err);
+            }
+        }
         self.width = width;
         self.height = height;
-        let sizes = ContainerList::calculate_sizes(
-            ratios,
-            orientation_scalar(&self.orientation, self.get_width(), self.get_height()),
-        );
-        for i in 0..self.children.len() {
-            let (width, height) = match self.orientation {
-                Direction::Horizontal => (sizes[i], self.get_height()),
-                Direction::Vertical => (self.get_width(), sizes[i]),
-            };
-            self.children[i].as_base_mut().resize(width, height)?;
-        }
         self.invalidate();
         Ok(())
     }
