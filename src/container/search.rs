@@ -17,11 +17,11 @@ pub trait ContainerSearch {
     fn search_name(&self, path: &str) -> Option<(&ContainerChild, ComponentPos)>;
     fn search_name_mut(&mut self, path: &str) -> Option<(&mut ContainerChild, ComponentPos)>;
 
-    fn search_name_widget<T>(&self, path: &str) -> Option<(&T, ComponentPos)>
+    fn search_name_widget<T>(&self, path: &str) -> Option<&T>
     where
         T: ComponentWidget + 'static,
     {
-        let Some((child, pos)) = self.search_name(path) else {
+        let Some((child, _)) = self.search_name(path) else {
             return None;
         };
         let ContainerChild::Component(component) = child else {
@@ -30,14 +30,14 @@ pub trait ContainerSearch {
         let Some(widget) = component.get_widget_as_any().downcast_ref::<T>() else {
             return None;
         };
-        Some((widget, pos))
+        Some(widget)
     }
 
-    fn search_name_widget_mut<T>(&mut self, path: &str) -> Option<(&mut T, ComponentPos)>
+    fn search_name_widget_mut<T>(&mut self, path: &str) -> Option<&mut T>
     where
         T: ComponentWidget + 'static,
     {
-        let Some((child, pos)) = self.search_name_mut(path) else {
+        let Some((child, _)) = self.search_name_mut(path) else {
             return None;
         };
         let ContainerChild::Component(component) = child else {
@@ -46,7 +46,7 @@ pub trait ContainerSearch {
         let Some(widget) = component.get_widget_as_any_mut().downcast_mut::<T>() else {
             return None;
         };
-        Some((widget, pos))
+        Some(widget)
     }
 }
 
