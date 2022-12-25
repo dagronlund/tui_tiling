@@ -9,13 +9,6 @@ use crate::{
     ResizeError,
 };
 
-fn orientation_scalar(orientation: &Direction, width: u16, height: u16) -> u16 {
-    match orientation {
-        Direction::Horizontal => width,
-        Direction::Vertical => height,
-    }
-}
-
 fn find_next_pos(
     pos: ComponentPos,
     border: Border,
@@ -76,6 +69,12 @@ impl Resize {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+enum SizingConstraint {
+    Fixed(u16),
+    Ratio(f64),
+}
+
 pub struct ContainerList {
     name: String,
     orientation: Direction,
@@ -106,49 +105,107 @@ impl ContainerList {
     }
 
     /// Gets the ratios of all the component sizes to the total
-    fn get_ratios(&self) -> Vec<f64> {
-        let total = orientation_scalar(&self.orientation, self.get_width(), self.get_height());
-        let any_zero = self.children.iter().any(|c| {
-            orientation_scalar(
-                &self.orientation,
-                c.as_base().get_width(),
-                c.as_base().get_height(),
-            ) == 0
-        });
-        // Return a default ratio list if any sub-component is zero or the
-        // container is
-        if total == 0 || any_zero {
-            return vec![1.0f64].repeat(self.children.len());
-        }
-        self.children
+    fn get_sizing_constraints(&self) -> Option<Vec<SizingConstraint>> {
+        // Collects initial fixed constraints and current ratio sizing
+        let constraints = self
+            .children
             .iter()
-            .map(|c| {
-                orientation_scalar(
-                    &self.orientation,
-                    c.as_base().get_width(),
-                    c.as_base().get_height(),
-                ) as f64
-                    / total as f64
+            .map(|c| c.as_base())
+            .map(|c| match self.orientation {
+                Direction::Horizontal if c.is_fixed_width() => {
+                    SizingConstraint::Fixed(c.get_width())
+                }
+                Direction::Horizontal => SizingConstraint::Ratio(c.get_width() as f64),
+                Direction::Vertical if c.is_fixed_height() => {
+                    SizingConstraint::Fixed(c.get_height())
+                }
+                Direction::Vertical => SizingConstraint::Ratio(c.get_height() as f64),
             })
-            .collect()
+            .collect::<Vec<SizingConstraint>>();
+        // Calculates the total size/count of all ratio controlled components
+        let total_ratio = constraints
+            .iter()
+            .map(|c| match c {
+                SizingConstraint::Fixed(_) => 0.0,
+                SizingConstraint::Ratio(r) => *r,
+            })
+            .sum::<f64>();
+        let num_ratio = constraints
+            .iter()
+            .map(|c| match c {
+                SizingConstraint::Fixed(_) => 0,
+                SizingConstraint::Ratio(_) => 1,
+            })
+            .sum::<u16>();
+        // If any ratio-controlled size is zero, fallback on assigning same
+        // ratio to all ratio-controlled components
+        let any_ratio_zero = constraints.iter().any(|c| match c {
+            SizingConstraint::Ratio(r) if *r == 0.0 => true,
+            _ => false,
+        });
+        // Calculate normalized ratios
+        let constraints = constraints
+            .iter()
+            .map(|c| match c {
+                SizingConstraint::Fixed(f) => SizingConstraint::Fixed(*f),
+                SizingConstraint::Ratio(_) if any_ratio_zero => {
+                    SizingConstraint::Ratio(1.0 / num_ratio as f64)
+                }
+                SizingConstraint::Ratio(r) => SizingConstraint::Ratio(r / total_ratio),
+            })
+            .collect::<Vec<SizingConstraint>>();
+        Some(constraints)
     }
 
     /// Sets all the children to be proportioned sizes in the container
-    fn calculate_sizes(ratios: Vec<f64>, total_size: u16) -> Vec<u16> {
-        let sum = ratios.iter().sum::<f64>();
-        let ratios = ratios.iter().map(|r| r / sum).collect::<Vec<f64>>();
-        let mut sizes = Vec::new();
-        let mut sub_total = 0;
-        for i in 0..ratios.len() {
-            let calculated = if i < ratios.len() - 1 {
-                (ratios[i] * total_size as f64) as u16
-            } else {
-                total_size - sub_total
-            };
-            sizes.push(calculated);
-            sub_total += calculated;
+    fn calculate_sizes(constraints: Vec<SizingConstraint>, size: u16) -> Option<Vec<u16>> {
+        // Splits the constraints into fixed and ratio lists
+        let fixed_constraints = constraints
+            .iter()
+            .enumerate()
+            .filter_map(|(i, c)| match c {
+                SizingConstraint::Fixed(f) => Some((i, *f)),
+                _ => None,
+            })
+            .collect::<Vec<(usize, u16)>>();
+        let ratio_constraints = constraints
+            .iter()
+            .enumerate()
+            .filter_map(|(i, c)| match c {
+                SizingConstraint::Ratio(r) => Some((i, *r)),
+                _ => None,
+            })
+            .collect::<Vec<(usize, f64)>>();
+
+        let mut result = vec![0].repeat(constraints.len());
+        let mut result_total = 0;
+        // Assign and sum fixed constraints first
+        for (i, f) in fixed_constraints {
+            result[i] = f;
+            result_total += result[i];
+            // No room for fixed components
+            if result_total > size {
+                return None;
+            }
         }
-        sizes
+        let size = size - result_total;
+        let mut result_total = 0;
+
+        // Assign ratio constraints next, checking if no space
+        let num_ratio_constraints = ratio_constraints.len();
+        for (index, (i, r)) in ratio_constraints.into_iter().enumerate() {
+            if index < num_ratio_constraints - 1 {
+                result[i] = (r * size as f64) as u16;
+            } else {
+                result[i] = size - result_total;
+            }
+            result_total += result[i];
+            // Ratio results in too small of a component
+            if result[i] == 0 {
+                return None;
+            }
+        }
+        Some(result)
     }
 
     /// Adds a new component to the container, resizes the existing children
@@ -202,6 +259,22 @@ impl ContainerList {
             ),
             Resize::None => return,
         };
+        // Make sure that this will not resize a fixed size component on either side
+        match orientation {
+            Direction::Horizontal
+                if (self.get_children()[index0].as_base().is_fixed_width()
+                    || self.get_children()[index1].as_base().is_fixed_width()) =>
+            {
+                return
+            }
+            Direction::Vertical
+                if (self.get_children()[index0].as_base().is_fixed_height()
+                    || self.get_children()[index1].as_base().is_fixed_height()) =>
+            {
+                return
+            }
+            _ => {}
+        }
         // Get current sizes of child components
         let (width0, height0, width1, height1) = (
             self.get_children()[index0].as_base().get_width(),
@@ -429,14 +502,37 @@ impl ComponentBase for ContainerList {
         if self.width == width && self.height == height {
             return Ok(());
         }
-        let ratios = self.get_ratios();
-        let orientation = orientation_scalar(&self.orientation, width, height);
-        let old_sizes = self
+        // Get constraints for resizing later
+        let Some(constraints) = self.get_sizing_constraints() else {
+            return Err(ResizeError {
+                name: self.get_name(),
+                width,
+                height,
+                border_width: 0
+            });
+        };
+        // Get current sizing
+        let old_dimensions = self
             .children
             .iter()
             .map(|c| (c.as_base().get_width(), c.as_base().get_height()))
             .collect::<Vec<(u16, u16)>>();
-        let new_sizes = ContainerList::calculate_sizes(ratios, orientation)
+        // Calculate new sizing
+        let Some(new_sizes) = ContainerList::calculate_sizes(
+            constraints,
+            match self.orientation {
+                Direction::Horizontal => width,
+                Direction::Vertical => height,
+            },
+        ) else {
+            return Err(ResizeError {
+                name: self.get_name(),
+                width,
+                height,
+                border_width: 0
+            });
+        };
+        let new_sizes = new_sizes
             .iter()
             .map(|s| match self.orientation {
                 Direction::Horizontal => (*s, height),
@@ -451,7 +547,7 @@ impl ComponentBase for ContainerList {
                 for i in 0..self.children.len() {
                     let _ = self.children[i]
                         .as_base_mut()
-                        .resize(old_sizes[i].0, old_sizes[i].1);
+                        .resize(old_dimensions[i].0, old_dimensions[i].1);
                 }
                 return Err(err);
             }
@@ -485,6 +581,14 @@ impl ComponentBase for ContainerList {
 
     fn get_height(&self) -> u16 {
         self.height
+    }
+
+    fn is_fixed_width(&self) -> bool {
+        self.children.iter().all(|c| c.as_base().is_fixed_width())
+    }
+
+    fn is_fixed_height(&self) -> bool {
+        self.children.iter().all(|c| c.as_base().is_fixed_height())
     }
 
     fn get_focus(&self) -> Focus {

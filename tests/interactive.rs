@@ -10,7 +10,7 @@ use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event as CrosstermEvent},
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     tty::IsTty,
-    QueueableCommand, Result,
+    QueueableCommand, Result as CrosstermResult,
 };
 use tui::{
     backend::CrosstermBackend,
@@ -22,6 +22,7 @@ use tui::{
 use tui_layout::{
     component::{Component, ComponentBase, ComponentBaseWidget, ComponentWidget},
     container::{list::ContainerList, Container},
+    ResizeError,
 };
 
 pub struct TestComponentWidget {
@@ -99,28 +100,35 @@ fn spawn_input_listener(tx: Sender<CrosstermEvent>) {
     });
 }
 
-fn get_tui_container() -> Box<dyn Container> {
+pub fn get_tui(print_last: bool) -> Result<Box<dyn Container>, ResizeError> {
+    let mut component_fixed = Component::new(
+        String::from("a"),
+        1,
+        Box::new(TestComponentWidget::new(print_last)),
+    );
+    component_fixed.set_fixed_height(Some(6));
     let component_a = Component::new(
         String::from("a"),
         1,
-        Box::new(TestComponentWidget::new(true)),
+        Box::new(TestComponentWidget::new(print_last)),
     );
     let component_b = Component::new(
         String::from("b"),
         1,
-        Box::new(TestComponentWidget::new(true)),
+        Box::new(TestComponentWidget::new(print_last)),
     );
     let component_c = Component::new(
         String::from("c"),
         1,
-        Box::new(TestComponentWidget::new(true)),
+        Box::new(TestComponentWidget::new(print_last)),
     );
 
     let mut list_vertical =
         ContainerList::new(String::from("vertical"), Direction::Vertical, true, 0, 0);
 
-    let _ = list_vertical.add_component(component_a);
-    let _ = list_vertical.add_component(component_b);
+    list_vertical.add_component(component_fixed)?;
+    list_vertical.add_component(component_a)?;
+    list_vertical.add_component(component_b)?;
 
     let mut list_horizontal = ContainerList::new(
         String::from("horizontal"),
@@ -130,13 +138,13 @@ fn get_tui_container() -> Box<dyn Container> {
         0,
     );
 
-    let _ = list_horizontal.add_container(Box::new(list_vertical));
-    let _ = list_horizontal.add_component(component_c);
+    list_horizontal.add_container(Box::new(list_vertical))?;
+    list_horizontal.add_component(component_c)?;
 
-    Box::new(list_horizontal)
+    Ok(Box::new(list_horizontal))
 }
 
-fn setup_terminal() -> Result<Terminal<CrosstermBackend<Stdout>>> {
+fn setup_terminal() -> CrosstermResult<Terminal<CrosstermBackend<Stdout>>> {
     enable_raw_mode().unwrap();
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
     terminal.backend_mut().queue(EnableMouseCapture)?;
@@ -146,7 +154,7 @@ fn setup_terminal() -> Result<Terminal<CrosstermBackend<Stdout>>> {
     Ok(terminal)
 }
 
-fn cleanup_terminal(terminal: &mut Terminal<CrosstermBackend<Stdout>>) -> Result<()> {
+fn cleanup_terminal(terminal: &mut Terminal<CrosstermBackend<Stdout>>) -> CrosstermResult<()> {
     terminal.backend_mut().queue(DisableMouseCapture)?;
     terminal.backend_mut().queue(LeaveAlternateScreen)?;
     terminal.backend_mut().flush()?;
@@ -155,13 +163,15 @@ fn cleanup_terminal(terminal: &mut Terminal<CrosstermBackend<Stdout>>) -> Result
     Ok(())
 }
 
-fn cleanup_terminal_force() -> Result<()> {
+fn cleanup_terminal_force() -> CrosstermResult<()> {
     cleanup_terminal(&mut Terminal::new(CrosstermBackend::new(stdout()))?)
 }
 
-fn tui_main_unmanaged(terminal: &mut Terminal<CrosstermBackend<Stdout>>) -> Result<String> {
+fn tui_main_unmanaged(
+    mut tui: Box<dyn Container>,
+    terminal: &mut Terminal<CrosstermBackend<Stdout>>,
+) -> CrosstermResult<String> {
     let (tx_input, rx_input) = unbounded();
-    let mut container = get_tui_container();
     let mut last_buffer: Option<Buffer> = None;
     spawn_input_listener(tx_input);
 
@@ -180,14 +190,14 @@ fn tui_main_unmanaged(terminal: &mut Terminal<CrosstermBackend<Stdout>>) -> Resu
 
         // Render the next frame
         let next_frame = terminal.draw(|frame| {
-            if let Err(err) = container
+            if let Err(err) = tui
                 .as_base_mut()
                 .resize(frame.size().width, frame.size().height)
             {
                 panic!("Resizing Error! ({err:?})");
             }
             frame.render_stateful_widget(
-                ComponentBaseWidget::from(container.as_base_mut()),
+                ComponentBaseWidget::from(tui.as_base_mut()),
                 frame.size(),
                 &mut (),
             );
@@ -201,16 +211,15 @@ fn tui_main_unmanaged(terminal: &mut Terminal<CrosstermBackend<Stdout>>) -> Resu
                     if key.clone().code == KeyCode::Char('q') {
                         done_msg = Some(String::from("User quit!"));
                     } else {
-                        container.as_base_mut().handle_key(key);
+                        tui.as_base_mut().handle_key(key);
                     }
                 }
                 CrosstermEvent::Mouse(event) => {
-                    container
-                        .as_base_mut()
+                    tui.as_base_mut()
                         .handle_mouse(event.column, event.row, Some(event.kind));
                 }
                 CrosstermEvent::Resize(columns, rows) => {
-                    if let Err(err) = container.as_base_mut().resize(rows, columns) {
+                    if let Err(err) = tui.as_base_mut().resize(rows, columns) {
                         panic!("Resizing Error! ({err:?})");
                     }
                 }
@@ -244,7 +253,7 @@ thread_local! {
     static BACKTRACE: RefCell<Option<Backtrace>> = RefCell::new(None);
 }
 
-pub fn tui_main() -> Result<()> {
+pub fn tui_main() -> CrosstermResult<()> {
     if !stdout().is_tty() {
         panic!("Error: Cannot open viewer when not TTY!");
     }
@@ -255,7 +264,11 @@ pub fn tui_main() -> Result<()> {
     }));
 
     // Catch any panics and try to cleanup the terminal first
-    match std::panic::catch_unwind(|| tui_main_unmanaged(&mut setup_terminal().unwrap()).unwrap()) {
+    match std::panic::catch_unwind(|| {
+        let tui = get_tui(true).unwrap();
+        let mut terminal = setup_terminal().unwrap();
+        tui_main_unmanaged(tui, &mut terminal).unwrap()
+    }) {
         Ok(msg) => println!("{}", msg),
         Err(e) => {
             cleanup_terminal_force()?;

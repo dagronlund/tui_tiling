@@ -4,7 +4,6 @@ use crossterm::event::{
     KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers, MouseButton, MouseEventKind,
 };
 use tui::layout::Direction;
-
 use tui_layout::{
     component::{Component, ComponentBase},
     container::list::ContainerList,
@@ -18,11 +17,12 @@ use crate::interactive::*;
 
 #[test]
 fn test_tui_layout() -> Result<(), tui_layout::ResizeError> {
-    let component_a = Component::new(
+    let mut component_a = Component::new(
         String::from("a"),
         1,
         Box::new(TestComponentWidget::new(false)),
     );
+    component_a.set_fixed_height(Some(4));
     let component_b = Component::new(
         String::from("b"),
         1,
@@ -40,7 +40,7 @@ fn test_tui_layout() -> Result<(), tui_layout::ResizeError> {
     let _ = list_vertical.add_component(component_a);
     let _ = list_vertical.add_component(component_b);
 
-    let mut list_horizontal = ContainerList::new(
+    let mut tui = ContainerList::new(
         String::from("horizontal"),
         Direction::Horizontal,
         true,
@@ -48,17 +48,17 @@ fn test_tui_layout() -> Result<(), tui_layout::ResizeError> {
         0,
     );
 
-    let _ = list_horizontal.add_container(Box::new(list_vertical));
-    let _ = list_horizontal.add_component(component_c);
+    let _ = tui.add_container(Box::new(list_vertical));
+    let _ = tui.add_component(component_c);
 
-    assert_ne!(list_horizontal.resize(20, 0), Ok(()));
+    assert_ne!(tui.resize(20, 0), Ok(()));
     // Size should still be zero since last change was un-done
-    assert_eq!(list_horizontal.resize(0, 0), Ok(()));
-    assert_ne!(list_horizontal.resize(20, 1), Ok(()));
-    assert_ne!(list_horizontal.resize(1, 20), Ok(()));
+    assert_eq!(tui.resize(0, 0), Ok(()));
+    assert_ne!(tui.resize(20, 1), Ok(()));
+    assert_ne!(tui.resize(1, 20), Ok(()));
 
-    list_horizontal.resize(20, 10)?;
-    list_horizontal.resize(32, 8)?;
+    tui.resize(20, 10)?;
+    tui.resize(32, 8)?;
 
     let expected = [
         "╭a─────────────╮╭c─────────────╮",
@@ -71,84 +71,82 @@ fn test_tui_layout() -> Result<(), tui_layout::ResizeError> {
         "╰──────────────╯╰──────────────╯",
     ];
 
-    let buffer = render_helper(list_horizontal.as_base_mut());
+    let buffer = render_helper(tui.as_base_mut());
+    for y in 0..buffer.area.height {
+        for x in 0..buffer.area.width {
+            print!("{}", buffer.get(x, y).symbol);
+        }
+        println!();
+    }
     for y in 0..buffer.area.height {
         for x in 0..buffer.area.width {
             assert_eq!(
                 buffer.get(x, y).symbol.chars().nth(0).unwrap(),
                 expected[y as usize].chars().nth(x as usize).unwrap()
             );
-            print!("{}", buffer.get(x, y).symbol);
         }
-        println!();
     }
 
-    let (comp, pos) = list_horizontal.as_container().search_name("c").unwrap();
+    let (comp, pos) = tui.as_container().search_name("c").unwrap();
     assert_eq!(comp.as_base().get_name(), String::from("c"));
     assert_eq!(pos, ComponentPos { x: 16, y: 0 });
 
-    let (comp, pos) = list_horizontal
-        .as_container()
-        .search_name("vertical.a")
-        .unwrap();
+    let (comp, pos) = tui.as_container().search_name("vertical.a").unwrap();
     assert_eq!(comp.as_base().get_name(), String::from("a"));
     assert_eq!(pos, ComponentPos { x: 0, y: 0 });
 
-    let (comp, pos) = list_horizontal
-        .as_container()
-        .search_name("vertical.b")
-        .unwrap();
+    let (comp, pos) = tui.as_container().search_name("vertical.b").unwrap();
     assert_eq!(comp.as_base().get_name(), String::from("b"));
     assert_eq!(pos, ComponentPos { x: 0, y: 4 });
 
-    if let Some(_) = list_horizontal.as_container().search_name("") {
+    if let Some(_) = tui.as_container().search_name("") {
         panic!("<empty> does not exist!");
     }
 
-    if let Some(_) = list_horizontal.as_container().search_name("vertical.c") {
+    if let Some(_) = tui.as_container().search_name("vertical.c") {
         panic!("vertical.c does not exist!");
     }
 
-    if let Some(_) = list_horizontal.as_container().search_name("vertical.c") {
+    if let Some(_) = tui.as_container().search_name("vertical.c") {
         panic!("vertical.b.c does not exist!");
     }
 
-    let (comp, pos) = list_horizontal
+    let (comp, pos) = tui
         .as_container()
         .search_position(ComponentPos { x: 16, y: 0 })
         .unwrap();
     assert_eq!(comp.get_name(), String::from("c"));
     assert_eq!(pos, ComponentPos { x: 16, y: 0 });
 
-    let (comp, pos) = list_horizontal
+    let (comp, pos) = tui
         .as_container()
         .search_position(ComponentPos { x: 0, y: 0 })
         .unwrap();
     assert_eq!(comp.get_name(), String::from("a"));
     assert_eq!(pos, ComponentPos { x: 0, y: 0 });
 
-    let (comp, pos) = list_horizontal
+    let (comp, pos) = tui
         .as_container()
         .search_position(ComponentPos { x: 0, y: 4 })
         .unwrap();
     assert_eq!(comp.get_name(), String::from("b"));
     assert_eq!(pos, ComponentPos { x: 0, y: 4 });
 
-    match list_horizontal.as_container().search_focused() {
+    match tui.as_container().search_focused() {
         FocusResult::Focus(_) => panic!("No component should be focused!"),
         FocusResult::PartialFocus(_) => panic!("No component should be partial focused!"),
         FocusResult::None => {}
     }
 
     // Hit enter to partial focus first component
-    list_horizontal.handle_key(KeyEvent {
+    tui.handle_key(KeyEvent {
         code: KeyCode::Enter,
         modifiers: KeyModifiers::empty(),
         kind: KeyEventKind::Press,
         state: KeyEventState::empty(),
     });
 
-    match list_horizontal.as_container().search_focused() {
+    match tui.as_container().search_focused() {
         FocusResult::Focus(_) => panic!("No component should be focused!"),
         FocusResult::PartialFocus((comp, pos)) => {
             assert_eq!(comp.get_name(), String::from("a"));
@@ -158,14 +156,14 @@ fn test_tui_layout() -> Result<(), tui_layout::ResizeError> {
     }
 
     // Hit enter to focus
-    list_horizontal.handle_key(KeyEvent {
+    tui.handle_key(KeyEvent {
         code: KeyCode::Enter,
         modifiers: KeyModifiers::empty(),
         kind: KeyEventKind::Press,
         state: KeyEventState::empty(),
     });
 
-    match list_horizontal.as_container().search_focused() {
+    match tui.as_container().search_focused() {
         FocusResult::Focus((comp, pos)) => {
             assert_eq!(comp.get_name(), String::from("a"));
             assert_eq!(pos, ComponentPos { x: 0, y: 0 });
@@ -175,14 +173,14 @@ fn test_tui_layout() -> Result<(), tui_layout::ResizeError> {
     }
 
     // Hit esc to partial focus
-    list_horizontal.handle_key(KeyEvent {
+    tui.handle_key(KeyEvent {
         code: KeyCode::Esc,
         modifiers: KeyModifiers::empty(),
         kind: KeyEventKind::Press,
         state: KeyEventState::empty(),
     });
 
-    match list_horizontal.as_container().search_focused() {
+    match tui.as_container().search_focused() {
         FocusResult::Focus(_) => panic!("No component should be focused!"),
         FocusResult::PartialFocus((comp, pos)) => {
             assert_eq!(comp.get_name(), String::from("a"));
@@ -192,14 +190,14 @@ fn test_tui_layout() -> Result<(), tui_layout::ResizeError> {
     }
 
     // Hit down to partial focus component below
-    list_horizontal.handle_key(KeyEvent {
+    tui.handle_key(KeyEvent {
         code: KeyCode::Down,
         modifiers: KeyModifiers::empty(),
         kind: KeyEventKind::Press,
         state: KeyEventState::empty(),
     });
 
-    match list_horizontal.as_container().search_focused() {
+    match tui.as_container().search_focused() {
         FocusResult::Focus(_) => panic!("No component should be focused!"),
         FocusResult::PartialFocus((comp, pos)) => {
             assert_eq!(comp.get_name(), String::from("b"));
@@ -209,14 +207,14 @@ fn test_tui_layout() -> Result<(), tui_layout::ResizeError> {
     }
 
     // Hit right to partial focus component right
-    list_horizontal.handle_key(KeyEvent {
+    tui.handle_key(KeyEvent {
         code: KeyCode::Right,
         modifiers: KeyModifiers::empty(),
         kind: KeyEventKind::Press,
         state: KeyEventState::empty(),
     });
 
-    match list_horizontal.as_container().search_focused() {
+    match tui.as_container().search_focused() {
         FocusResult::Focus(_) => panic!("No component should be focused!"),
         FocusResult::PartialFocus((comp, pos)) => {
             assert_eq!(comp.get_name(), String::from("c"));
@@ -226,14 +224,14 @@ fn test_tui_layout() -> Result<(), tui_layout::ResizeError> {
     }
 
     // Hit right to partial focus component right (should not change)
-    list_horizontal.handle_key(KeyEvent {
+    tui.handle_key(KeyEvent {
         code: KeyCode::Right,
         modifiers: KeyModifiers::empty(),
         kind: KeyEventKind::Press,
         state: KeyEventState::empty(),
     });
 
-    match list_horizontal.as_container().search_focused() {
+    match tui.as_container().search_focused() {
         FocusResult::Focus(_) => panic!("No component should be focused!"),
         FocusResult::PartialFocus((comp, pos)) => {
             assert_eq!(comp.get_name(), String::from("c"));
@@ -242,12 +240,12 @@ fn test_tui_layout() -> Result<(), tui_layout::ResizeError> {
         FocusResult::None => panic!("A component should be partial focused!"),
     }
 
-    assert_eq!(list_horizontal.get_border(1, 0), Some(Border::Top));
-    assert_eq!(list_horizontal.get_border(0, 1), Some(Border::Left));
-    assert_eq!(list_horizontal.get_border(0, 6), Some(Border::Left));
-    assert_eq!(list_horizontal.get_border(15, 1), None);
-    assert_eq!(list_horizontal.get_border(1, 7), Some(Border::Bottom));
-    assert_eq!(list_horizontal.get_border(31, 1), Some(Border::Right));
+    assert_eq!(tui.get_border(1, 0), Some(Border::Top));
+    assert_eq!(tui.get_border(0, 1), Some(Border::Left));
+    assert_eq!(tui.get_border(0, 6), Some(Border::Left));
+    assert_eq!(tui.get_border(15, 1), None);
+    assert_eq!(tui.get_border(1, 7), Some(Border::Bottom));
+    assert_eq!(tui.get_border(31, 1), Some(Border::Right));
 
     let expected = [
         "╭a──────────────╮╭c────────────╮",
@@ -260,12 +258,12 @@ fn test_tui_layout() -> Result<(), tui_layout::ResizeError> {
         "╰───────────────╯╰─────────────╯",
     ];
 
-    list_horizontal.handle_mouse(16, 4, Some(MouseEventKind::Down(MouseButton::Left)));
-    list_horizontal.handle_mouse(17, 4, Some(MouseEventKind::Drag(MouseButton::Left)));
-    list_horizontal.handle_mouse(17, 4, None);
-    list_horizontal.handle_mouse(18, 4, Some(MouseEventKind::Drag(MouseButton::Left)));
+    tui.handle_mouse(16, 4, Some(MouseEventKind::Down(MouseButton::Left)));
+    tui.handle_mouse(17, 4, Some(MouseEventKind::Drag(MouseButton::Left)));
+    tui.handle_mouse(17, 4, None);
+    tui.handle_mouse(18, 4, Some(MouseEventKind::Drag(MouseButton::Left)));
 
-    let buffer = render_helper(list_horizontal.as_base_mut());
+    let buffer = render_helper(tui.as_base_mut());
     for y in 0..buffer.area.height {
         for x in 0..buffer.area.width {
             assert_eq!(
@@ -281,6 +279,6 @@ fn test_tui_layout() -> Result<(), tui_layout::ResizeError> {
 }
 
 #[test]
-fn test_tui() -> Result<(), std::io::Error> {
+fn test_tui_interactive() -> Result<(), std::io::Error> {
     tui_main()
 }

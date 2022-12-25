@@ -34,6 +34,9 @@ pub trait ComponentBase {
     fn get_width(&self) -> u16;
     fn get_height(&self) -> u16;
 
+    fn is_fixed_width(&self) -> bool;
+    fn is_fixed_height(&self) -> bool;
+
     /// Renders the component to the area specified on the buffer, marking the
     /// component as clean when done
     fn render(&mut self, area: Rect, buf: &mut Buffer);
@@ -51,6 +54,8 @@ pub struct Component {
     name: String,
     width: u16,
     height: u16,
+    fixed_width: bool,
+    fixed_height: bool,
     border_width: u16,
     invalidated: bool,
     focus: Focus,
@@ -63,6 +68,8 @@ impl Component {
             name,
             width: 0,
             height: 0,
+            fixed_width: false,
+            fixed_height: false,
             border_width,
             invalidated: true,
             focus: Focus::None,
@@ -95,6 +102,24 @@ impl Component {
 
     pub fn get_widget_as_any_mut(&mut self) -> &mut dyn std::any::Any {
         &mut self.widget
+    }
+
+    pub fn set_fixed_width(&mut self, fixed_width: Option<u16>) {
+        if let Some(width) = fixed_width {
+            self.width = width;
+            self.fixed_width = true;
+        } else {
+            self.fixed_width = false;
+        }
+    }
+
+    pub fn set_fixed_height(&mut self, fixed_height: Option<u16>) {
+        if let Some(height) = fixed_height {
+            self.height = height;
+            self.fixed_height = true;
+        } else {
+            self.fixed_height = false;
+        }
     }
 }
 
@@ -183,8 +208,12 @@ impl ComponentBase for Component {
         if self.width != width || self.height != height {
             self.invalidate();
         }
-        self.width = width;
-        self.height = height;
+        if !self.fixed_width {
+            self.width = width;
+        }
+        if !self.fixed_height {
+            self.height = height;
+        }
         self.widget.resize(width, height);
         Ok(())
     }
@@ -195,6 +224,14 @@ impl ComponentBase for Component {
 
     fn get_height(&self) -> u16 {
         self.height
+    }
+
+    fn is_fixed_width(&self) -> bool {
+        self.fixed_width
+    }
+
+    fn is_fixed_height(&self) -> bool {
+        self.fixed_height
     }
 
     fn render(&mut self, area: Rect, buf: &mut Buffer) {
