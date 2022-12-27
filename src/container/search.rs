@@ -27,7 +27,7 @@ pub trait ContainerSearch {
         let ContainerChild::Component(component) = child else {
             return None;
         };
-        let Some(widget) = component.get_widget_as_any().downcast_ref::<T>() else {
+        let Some(widget) = component.get_widget().as_any().downcast_ref::<T>() else {
             return None;
         };
         Some(widget)
@@ -43,7 +43,7 @@ pub trait ContainerSearch {
         let ContainerChild::Component(component) = child else {
             return None;
         };
-        let Some(widget) = component.get_widget_as_any_mut().downcast_mut::<T>() else {
+        let Some(widget) = component.get_widget_mut().as_any_mut().downcast_mut::<T>() else {
             return None;
         };
         Some(widget)

@@ -34,6 +34,18 @@ fn test_tui_layout() -> Result<(), tui_layout::ResizeError> {
         Box::new(TestComponentWidget::new(false)),
     );
 
+    assert!(component_a
+        .get_widget()
+        .as_any()
+        .downcast_ref::<TestComponentWidget>()
+        .is_some());
+
+    assert!(component_a
+        .get_widget_mut()
+        .as_any_mut()
+        .downcast_mut::<TestComponentWidget>()
+        .is_some());
+
     let mut list_vertical =
         ContainerList::new(String::from("vertical"), Direction::Vertical, true, 0, 0);
 
@@ -50,6 +62,16 @@ fn test_tui_layout() -> Result<(), tui_layout::ResizeError> {
 
     let _ = tui.add_container(Box::new(list_vertical));
     let _ = tui.add_component(component_c);
+
+    assert!(tui
+        .as_container()
+        .search_name_widget::<TestComponentWidget>("vertical.a")
+        .is_some());
+
+    assert!(tui
+        .as_container_mut()
+        .search_name_widget_mut::<TestComponentWidget>("vertical.a")
+        .is_some());
 
     assert_ne!(tui.resize(20, 0), Ok(()));
     // Size should still be zero since last change was un-done

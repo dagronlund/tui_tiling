@@ -17,6 +17,9 @@ pub trait ComponentWidget {
     fn resize(&mut self, width: u16, height: u16);
     /// Renders the component to the area specified on the buffer
     fn render(&mut self, area: Rect, buf: &mut Buffer);
+
+    fn as_any(&self) -> &dyn std::any::Any;
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
 }
 
 pub trait ComponentBase {
@@ -94,14 +97,6 @@ impl Component {
 
     pub fn get_widget_mut(&mut self) -> &mut dyn ComponentWidget {
         &mut *self.widget
-    }
-
-    pub fn get_widget_as_any(&self) -> &dyn std::any::Any {
-        &self.widget
-    }
-
-    pub fn get_widget_as_any_mut(&mut self) -> &mut dyn std::any::Any {
-        &mut self.widget
     }
 
     pub fn set_fixed_width(&mut self, fixed_width: Option<u16>) {
