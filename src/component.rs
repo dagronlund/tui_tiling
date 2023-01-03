@@ -151,14 +151,14 @@ impl ComponentBase for Component {
 
     fn handle_key(&mut self, e: KeyEvent) -> Option<Border> {
         match self.get_focus() {
-            Focus::Focus => match e.clone().code {
+            Focus::Focus => match e.code {
                 KeyCode::Esc => self.set_focus(Focus::PartialFocus),
                 _ => {
                     self.widget.handle_key(e);
                     self.invalidate();
                 }
             },
-            Focus::PartialFocus => match e.clone().code {
+            Focus::PartialFocus => match e.code {
                 KeyCode::Up => {
                     self.set_focus(Focus::None);
                     return Some(Border::Top);
@@ -178,10 +178,8 @@ impl ComponentBase for Component {
                 KeyCode::Enter => self.set_focus(Focus::Focus),
                 _ => {}
             },
-            Focus::None => match e.clone().code {
-                KeyCode::Enter => self.set_focus(Focus::Focus),
-                _ => {}
-            },
+            Focus::None if e.code == KeyCode::Enter => self.set_focus(Focus::Focus),
+            _ => {}
         }
         None
     }
@@ -245,7 +243,7 @@ impl ComponentBase for Component {
                 .borders(Borders::ALL)
                 .style(Style::default().fg(border_color))
                 .border_type(BorderType::Rounded);
-            if self.get_name().len() > 0 {
+            if !self.get_name().is_empty() {
                 block.title(self.get_name()).render(area, buf)
             } else {
                 block.render(area, buf)

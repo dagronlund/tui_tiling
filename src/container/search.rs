@@ -116,7 +116,7 @@ impl<'a> ContainerSearch for dyn Container + 'a {
             return match child {
                 ContainerChild::Component(child) => Some((child, child_offsets[i].clone())),
                 ContainerChild::Container(child) => {
-                    let new_pos = (pos.clone() - child_offsets[i].clone()).unwrap();
+                    let new_pos = (pos - child_offsets[i].clone()).unwrap();
                     if let Some((child, pos)) = child.search_position(new_pos) {
                         Some((child, child_offsets[i].clone() + pos))
                     } else {
@@ -139,7 +139,7 @@ impl<'a> ContainerSearch for dyn Container + 'a {
             return match child {
                 ContainerChild::Component(child) => Some((child, child_offsets[i].clone())),
                 ContainerChild::Container(child) => {
-                    let new_pos = (pos.clone() - child_offsets[i].clone()).unwrap();
+                    let new_pos = (pos - child_offsets[i].clone()).unwrap();
                     if let Some((child, pos)) = child.search_position_mut(new_pos) {
                         Some((child, child_offsets[i].clone() + pos))
                     } else {
@@ -152,7 +152,7 @@ impl<'a> ContainerSearch for dyn Container + 'a {
     }
 
     fn search_name(&self, path: &str) -> Option<(&ContainerChild, ComponentPos)> {
-        let (before, after) = if let Some((before, after)) = path.split_once(".") {
+        let (before, after) = if let Some((before, after)) = path.split_once('.') {
             (before, Some(after))
         } else {
             (path, None)
@@ -179,7 +179,7 @@ impl<'a> ContainerSearch for dyn Container + 'a {
     }
 
     fn search_name_mut(&mut self, path: &str) -> Option<(&mut ContainerChild, ComponentPos)> {
-        let (before, after) = if let Some((before, after)) = path.split_once(".") {
+        let (before, after) = if let Some((before, after)) = path.split_once('.') {
             (before, Some(after))
         } else {
             (path, None)

@@ -37,7 +37,7 @@ impl ComponentWidgetSimple {
     }
 
     pub fn get_style(&self) -> Style {
-        self.style.clone()
+        self.style
     }
 
     pub fn set_style(&mut self, style: Style) {
@@ -50,7 +50,7 @@ impl ComponentWidgetSimple {
     }
 
     pub fn get_alignment(&self) -> Alignment {
-        self.alignment.clone()
+        self.alignment
     }
 
     pub fn set_alignment(&mut self, alignment: Alignment) {
@@ -60,6 +60,12 @@ impl ComponentWidgetSimple {
     pub fn alignment(mut self, alignment: Alignment) -> Self {
         self.alignment = alignment;
         self
+    }
+}
+
+impl Default for ComponentWidgetSimple {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

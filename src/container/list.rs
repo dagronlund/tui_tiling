@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEventKind};
 use tui::{
     buffer::Buffer,
@@ -139,10 +141,10 @@ impl ContainerList {
             .sum::<u16>();
         // If any ratio-controlled size is zero, fallback on assigning same
         // ratio to all ratio-controlled components
-        let any_ratio_zero = constraints.iter().any(|c| match c {
-            SizingConstraint::Ratio(r) if *r == 0.0 => true,
-            _ => false,
-        });
+        let any_ratio_zero = constraints
+            .iter()
+            .any(|c| matches!(c, SizingConstraint::Ratio(r) if *r == 0.0));
+
         // Calculate normalized ratios
         let constraints = constraints
             .iter()
@@ -304,18 +306,17 @@ impl ContainerList {
             }
         };
         // Use delta to determine which component to size first, none if 0
-        let (index0, width0, height0, index1, width1, height1) = if delta < 0 {
-            (index0, width0, height0, index1, width1, height1)
-        } else if delta > 0 {
-            (index1, width1, height1, index0, width0, height0)
-        } else {
-            return;
+        let (index0, width0, height0, index1, width1, height1) = match delta.cmp(&0) {
+            Ordering::Less => (index0, width0, height0, index1, width1, height1),
+            Ordering::Greater => (index1, width1, height1, index0, width0, height0),
+            Ordering::Equal => return,
         };
         // Resize component that is getting smaller first, there should be
         // no issue resizing component that is getting bigger
-        if let Err(_) = self.get_children_mut()[index0]
+        if self.get_children_mut()[index0]
             .as_base_mut()
             .resize(width0, height0)
+            .is_err()
         {
             self.resize = Resize::None;
             return;
@@ -420,9 +421,9 @@ impl ComponentBase for ContainerList {
         let mouse_pos = ComponentPos { x, y };
         let child_rects = self.as_container().get_children_rectangles();
         // Iterate through children, dispatching mouse event if intersects
-        for (i, child) in (&mut self.children).iter_mut().enumerate() {
+        for (i, child) in self.children.iter_mut().enumerate() {
             // Check mouse intersection, issue none if no intersection
-            if !mouse_pos.intersects_rect(child_rects[i].clone()) {
+            if !mouse_pos.intersects_rect(child_rects[i]) {
                 child.as_base_mut().handle_mouse(0, 0, None);
                 continue;
             }
@@ -472,7 +473,7 @@ impl ComponentBase for ContainerList {
             }
             FocusResult::None => {
                 // If nothing has focus, check if the right keys were pressed
-                match event.clone().code {
+                match event.code {
                     KeyCode::Enter
                     | KeyCode::Up
                     | KeyCode::Down
@@ -539,15 +540,10 @@ impl ComponentBase for ContainerList {
                 Direction::Vertical => (width, *s),
             })
             .collect::<Vec<(u16, u16)>>();
-        for i in 0..self.children.len() {
-            if let Err(err) = self.children[i]
-                .as_base_mut()
-                .resize(new_sizes[i].0, new_sizes[i].1)
-            {
-                for i in 0..self.children.len() {
-                    let _ = self.children[i]
-                        .as_base_mut()
-                        .resize(old_dimensions[i].0, old_dimensions[i].1);
+        for (i, size) in new_sizes.iter().enumerate().take(self.children.len()) {
+            if let Err(err) = self.children[i].as_base_mut().resize(size.0, size.1) {
+                for (i, dim) in old_dimensions.iter().enumerate().take(self.children.len()) {
+                    let _ = self.children[i].as_base_mut().resize(dim.0, dim.1);
                 }
                 return Err(err);
             }
@@ -562,7 +558,7 @@ impl ComponentBase for ContainerList {
         assert_eq!(area.width, self.width);
         assert_eq!(area.height, self.height);
         let child_rects = self.as_container().get_children_rectangles();
-        for (i, child) in (&mut self.children).iter_mut().enumerate() {
+        for (i, child) in self.children.iter_mut().enumerate() {
             child.as_base_mut().render(
                 Rect {
                     x: child_rects[i].x + area.x,
@@ -609,11 +605,11 @@ impl ComponentBase for ContainerList {
     fn get_border(&self, x: u16, y: u16) -> Option<Border> {
         let pos = ComponentPos { x, y };
         let child_rects = self.as_container().get_children_rectangles();
-        for (i, component) in (&self.children).iter().enumerate() {
+        for (i, component) in self.children.iter().enumerate() {
             let first = i == 0;
             let last = i == self.children.len() - 1;
             // Check if position in this child, otherwise try next one
-            if !pos.intersects_rect(child_rects[i].clone()) {
+            if !pos.intersects_rect(child_rects[i]) {
                 continue;
             }
             // If this child has no matching border, then no other child will

@@ -1,15 +1,9 @@
 use tui::layout::Rect;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ComponentPos {
     pub x: u16,
     pub y: u16,
-}
-
-impl Default for ComponentPos {
-    fn default() -> Self {
-        Self { x: 0, y: 0 }
-    }
 }
 
 impl std::ops::Add<ComponentPos> for ComponentPos {
