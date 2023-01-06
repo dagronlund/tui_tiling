@@ -43,12 +43,18 @@ impl TestComponentWidget {
 }
 
 impl ComponentWidget for TestComponentWidget {
-    fn handle_mouse(&mut self, x: u16, y: u16, e: MouseEventKind) {
+    fn handle_mouse(&mut self, x: u16, y: u16, e: MouseEventKind) -> bool {
         self.mouse_last = Some((x, y, e));
+        true
     }
 
-    fn handle_key(&mut self, e: KeyEvent) {
+    fn handle_key(&mut self, e: KeyEvent) -> bool {
         self.key_last = Some(e);
+        true
+    }
+
+    fn handle_update(&mut self) -> bool {
+        false
     }
 
     fn resize(&mut self, _: u16, _: u16) {}

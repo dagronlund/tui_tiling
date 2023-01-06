@@ -11,8 +11,12 @@ use tui::{
 use crate::{Border, Focus, ResizeError};
 
 pub trait ComponentWidget {
-    fn handle_mouse(&mut self, x: u16, y: u16, kind: MouseEventKind);
-    fn handle_key(&mut self, e: KeyEvent);
+    // Handles a mouse event, returns true if component needs to be redrawn
+    fn handle_mouse(&mut self, x: u16, y: u16, kind: MouseEventKind) -> bool;
+    // Handles a key event, returns true if component needs to be redrawn
+    fn handle_key(&mut self, e: KeyEvent) -> bool;
+    // Handles a general update, returns true if component needs to be redrawn
+    fn handle_update(&mut self) -> bool;
     /// Resizes this component to fit in the new size
     fn resize(&mut self, width: u16, height: u16);
     /// Renders the component to the area specified on the buffer
@@ -25,6 +29,7 @@ pub trait ComponentWidget {
 pub trait ComponentBase {
     fn handle_mouse(&mut self, x: u16, y: u16, kind: Option<MouseEventKind>);
     fn handle_key(&mut self, e: KeyEvent) -> Option<Border>;
+    fn handle_update(&mut self);
 
     /// Indicates that all sub-components need to be redrawn
     fn invalidate(&mut self);
@@ -154,8 +159,9 @@ impl ComponentBase for Component {
         // Send mouse event to widget if mouse is in widget and component focused
         if in_widget && self.focus == Focus::Focus {
             let (x, y) = (x - self.border_width, y - self.border_width);
-            self.widget.handle_mouse(x, y, kind);
-            self.invalidate();
+            if self.widget.handle_mouse(x, y, kind) {
+                self.invalidate();
+            }
         }
     }
 
@@ -164,8 +170,9 @@ impl ComponentBase for Component {
             Focus::Focus => match e.code {
                 KeyCode::Esc => self.set_focus(Focus::PartialFocus),
                 _ => {
-                    self.widget.handle_key(e);
-                    self.invalidate();
+                    if self.widget.handle_key(e) {
+                        self.invalidate();
+                    }
                 }
             },
             Focus::PartialFocus => match e.code {
@@ -192,6 +199,12 @@ impl ComponentBase for Component {
             _ => {}
         }
         None
+    }
+
+    fn handle_update(&mut self) {
+        if self.widget.handle_update() {
+            self.invalidate();
+        }
     }
 
     fn invalidate(&mut self) {

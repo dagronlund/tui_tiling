@@ -501,6 +501,12 @@ impl ComponentBase for ContainerList {
         None
     }
 
+    fn handle_update(&mut self) {
+        for component in &mut self.children {
+            component.as_base_mut().handle_update();
+        }
+    }
+
     fn invalidate(&mut self) {
         for component in &mut self.children {
             component.as_base_mut().invalidate();

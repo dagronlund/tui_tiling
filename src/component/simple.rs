@@ -70,9 +70,17 @@ impl Default for ComponentWidgetSimple {
 }
 
 impl ComponentWidget for ComponentWidgetSimple {
-    fn handle_mouse(&mut self, _x: u16, _y: u16, _e: MouseEventKind) {}
+    fn handle_mouse(&mut self, _x: u16, _y: u16, _e: MouseEventKind) -> bool {
+        true
+    }
 
-    fn handle_key(&mut self, _e: KeyEvent) {}
+    fn handle_key(&mut self, _e: KeyEvent) -> bool {
+        true
+    }
+
+    fn handle_update(&mut self) -> bool {
+        true
+    }
 
     fn resize(&mut self, _width: u16, _height: u16) {}
 
