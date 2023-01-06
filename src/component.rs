@@ -108,6 +108,11 @@ impl Component {
         }
     }
 
+    pub fn fixed_width(mut self, fixed_width: Option<u16>) -> Self {
+        self.set_fixed_width(fixed_width);
+        self
+    }
+
     pub fn set_fixed_height(&mut self, fixed_height: Option<u16>) {
         if let Some(height) = fixed_height {
             self.height = height;
@@ -115,6 +120,11 @@ impl Component {
         } else {
             self.fixed_height = false;
         }
+    }
+
+    pub fn fixed_height(mut self, fixed_height: Option<u16>) -> Self {
+        self.set_fixed_height(fixed_height);
+        self
     }
 }
 

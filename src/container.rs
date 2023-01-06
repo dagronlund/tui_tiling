@@ -40,17 +40,26 @@ impl ContainerChild {
     }
 }
 
-// // TODO: Lifetime issues?
-// impl std::ops::Deref for ContainerChild {
-//     type Target = dyn ComponentBase;
+impl From<Box<dyn Container>> for ContainerChild {
+    fn from(b: Box<dyn Container>) -> Self {
+        Self::Container(b)
+    }
+}
 
-//     fn deref(&self) -> &Self::Target {
-//         match self {
-//             Self::Container(container) => container.as_base(),
-//             Self::Component(component) => component,
-//         }
-//     }
-// }
+impl<T> From<T> for ContainerChild
+where
+    T: Container + 'static,
+{
+    fn from(b: T) -> Self {
+        Self::Container(Box::new(b))
+    }
+}
+
+impl From<Component> for ContainerChild {
+    fn from(c: Component) -> Self {
+        Self::Component(c)
+    }
+}
 
 pub trait Container
 where

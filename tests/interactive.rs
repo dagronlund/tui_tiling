@@ -19,6 +19,7 @@ use tui::{
     Terminal,
 };
 
+use tui_layout::container::ContainerChild;
 use tui_layout::{
     component::{Component, ComponentBase, ComponentBaseWidget, ComponentWidget},
     container::{list::ContainerList, Container},
@@ -109,47 +110,44 @@ fn spawn_input_listener(tx: Sender<CrosstermEvent>) {
 }
 
 pub fn get_tui(print_last: bool) -> Result<Box<dyn Container>, ResizeError> {
-    let mut component_fixed = Component::new(
-        String::from("a"),
-        1,
-        Box::new(TestComponentWidget::new(print_last)),
-    );
-    component_fixed.set_fixed_height(Some(6));
-    let component_a = Component::new(
-        String::from("a"),
-        1,
-        Box::new(TestComponentWidget::new(print_last)),
-    );
-    let component_b = Component::new(
-        String::from("b"),
-        1,
-        Box::new(TestComponentWidget::new(print_last)),
-    );
-    let component_c = Component::new(
-        String::from("c"),
-        1,
-        Box::new(TestComponentWidget::new(print_last)),
-    );
-
-    let mut list_vertical =
-        ContainerList::new(String::from("vertical"), Direction::Vertical, true, 0, 0);
-
-    list_vertical.add_component(component_fixed)?;
-    list_vertical.add_component(component_a)?;
-    list_vertical.add_component(component_b)?;
-
-    let mut list_horizontal = ContainerList::new(
+    let tui = ContainerList::new(
         String::from("horizontal"),
         Direction::Horizontal,
         true,
         0,
         0,
-    );
-
-    list_horizontal.add_container(Box::new(list_vertical))?;
-    list_horizontal.add_component(component_c)?;
-
-    Ok(Box::new(list_horizontal))
+    )
+    .from_children(vec![
+        ContainerChild::from(
+            ContainerList::new(String::from("vertical"), Direction::Vertical, true, 0, 0)
+                .from_children(vec![
+                    ContainerChild::from(
+                        Component::new(
+                            String::from("fixed"),
+                            1,
+                            Box::new(TestComponentWidget::new(print_last)),
+                        )
+                        .fixed_height(Some(6)),
+                    ),
+                    ContainerChild::from(Component::new(
+                        String::from("a"),
+                        1,
+                        Box::new(TestComponentWidget::new(print_last)),
+                    )),
+                    ContainerChild::from(Component::new(
+                        String::from("b"),
+                        1,
+                        Box::new(TestComponentWidget::new(print_last)),
+                    )),
+                ])?,
+        ),
+        ContainerChild::from(Component::new(
+            String::from("c"),
+            1,
+            Box::new(TestComponentWidget::new(print_last)),
+        )),
+    ])?;
+    Ok(Box::new(tui))
 }
 
 fn setup_terminal() -> CrosstermResult<Terminal<CrosstermBackend<Stdout>>> {

@@ -226,6 +226,14 @@ impl ContainerList {
         self.resize(self.get_width(), self.get_height())
     }
 
+    pub fn from_children(mut self, children: Vec<ContainerChild>) -> Result<Self, ResizeError> {
+        for child in children {
+            self.children.push(child);
+        }
+        self.resize(self.get_width(), self.get_height())?;
+        Ok(self)
+    }
+
     pub fn get_orientation(&self) -> Direction {
         self.orientation.clone()
     }
