@@ -1,6 +1,6 @@
 [package]
 name = "tui_tiling"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["David Gronlund"]
 edition = "2021"
 description = "A TUI library for tiling components and and directing input"

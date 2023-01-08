@@ -1,6 +1,6 @@
 pub mod simple;
 
-use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEventKind};
+use crossterm::event::{Event as CrosstermEvent, KeyCode, KeyEvent, MouseButton, MouseEventKind};
 use tui::{
     buffer::Buffer,
     layout::Rect,
@@ -30,6 +30,20 @@ pub trait ComponentBase {
     fn handle_mouse(&mut self, x: u16, y: u16, kind: Option<MouseEventKind>);
     fn handle_key(&mut self, e: KeyEvent) -> Option<Border>;
     fn handle_update(&mut self);
+
+    fn handle_input(&mut self, event: CrosstermEvent) -> Option<Border> {
+        match event {
+            CrosstermEvent::Key(key) => self.handle_key(key),
+            CrosstermEvent::Mouse(event) => {
+                self.handle_mouse(event.column, event.row, Some(event.kind));
+                None
+            }
+            CrosstermEvent::Resize(_, _)
+            | CrosstermEvent::FocusGained
+            | CrosstermEvent::FocusLost
+            | CrosstermEvent::Paste(_) => None,
+        }
+    }
 
     /// Indicates that all sub-components need to be redrawn
     fn invalidate(&mut self);
