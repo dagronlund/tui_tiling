@@ -4,7 +4,7 @@ use crossterm::event::{
     KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers, MouseButton, MouseEventKind,
 };
 use tui::layout::Direction;
-use tui_layout::{
+use tui_tiling::{
     component::{Component, ComponentBase},
     container::list::ContainerList,
     container::search::ContainerSearch,
@@ -16,7 +16,7 @@ use tui_layout::{
 use crate::interactive::*;
 
 #[test]
-fn test_tui_layout() -> Result<(), tui_layout::ResizeError> {
+fn test_tui_tiling() -> Result<(), tui_tiling::ResizeError> {
     let mut component_a = Component::new(
         String::from("a"),
         1,

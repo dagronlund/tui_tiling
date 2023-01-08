@@ -19,10 +19,9 @@ use tui::{
     Terminal,
 };
 
-use tui_layout::container::ContainerChild;
-use tui_layout::{
+use tui_tiling::{
     component::{Component, ComponentBase, ComponentBaseWidget, ComponentWidget},
-    container::{list::ContainerList, Container},
+    container::{list::ContainerList, Container, ContainerChild},
     ResizeError,
 };
 

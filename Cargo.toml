@@ -1,8 +1,13 @@
 [package]
-name = "tui_layout"
+name = "tui_tiling"
 version = "0.1.0"
+authors = ["David Gronlund"]
 edition = "2021"
-description = "A TUI management library for paneling and input focus."
+description = "A TUI library for tiling components and and directing input"
+readme = "README.md"
+repository = "https://github.com/dagronlund/tui_tiling"
+license = "MIT"
+keywords = ["tui", "terminal"]
 
 [dependencies]
 crossterm = "0.25.0"
